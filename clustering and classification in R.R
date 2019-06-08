@@ -1,0 +1,140 @@
+#HIERARCHICAL CLUSTERING:
+
+##Reading in the data
+EUProtein <- read.csv("EUProteinConsumption.csv", header = TRUE)
+
+## checking if there are	observations with	missing	values:
+any(is.na(EUProtein))
+which(complete.cases(EUProtein) == FALSE)
+
+## observing the structure of the dataset to know if scales are uniform and which variables are numerical
+str(EUProtein)
+head(EUProtein)
+
+## ensuring R does not perform calculations on the row names
+row.names(EUProtein) <- EUProtein[, 1]
+
+## using only numerical variables for the clustering process
+EUProtein <- EUProtein[, -1]
+
+## scaling/standardizing the data using scale() function:
+EUProtein_scaled <- scale(EUProtein)
+head(EUProtein_scaled)
+
+## calculating the distance matrix between observations in order to determine the optimal number of clusters
+##using Hierarchical Clustering
+d <- dist(EUProtein_scaled, method = "euclidean")  
+
+EUProtein_hcl_complete <- hclust(d, method = "complete")   ## cluster with "single" linkage
+EUProtein_hcl_single <- hclust(d, method = "single")     ## cluster with "single" linkage
+EUProtein_hcl_average <- hclust(d, method = "average")   ## cluster with "average" linkage
+EUProtein_hcl_ward <- hclust(d, method = "ward.D2")      ## cluster with "ward" linkage
+
+##enabling ploting the 4 graphs on one page for comparison
+par(mfrow = c(2, 2))
+
+##Drawing a dendrogram for each linkage method
+plot(EUProtein_hcl_complete, cex = 0.8, hang = -1, main = "Hierarchical Clustering with Complete Linkage")
+plot(EUProtein_hcl_single, cex = 0.8, hang = -1, main = "Hierarchical Clustering with Single Linkage")
+plot(EUProtein_hcl_average, cex = 0.8, hang = -1, main = "Hierarchical Clustering with Average Linkage")
+plot(EUProtein_hcl_ward, cex = 0.8, hang = -1, main = "Hierarchical Clustering with Ward Linkage")
+
+## Utilizing NbClust() inbuilt R function in determining the optimal number of clusters for Hierarchical Clustering
+##library("NbClust")
+NbClust(EUProtein_scaled, distance = "euclidean", min.nc = 2, max.nc = 10, method = "ward.D2")
+## In this case, according to the "majority rule", the optimal number of clusters for Ward Linkage method is 3, ##although 5 clusters could provide better information for the groups from visual inspection - personal opinion
+
+
+## drawing on the dendrogram a rectangle around each of the 5 clusters.
+plot(EUProtein_hcl_ward, cex = 0.8, hang = -1, main = "   Hierarchical Clustering with Ward.D2 ")
+rect.hclust(EUProtein_hcl_ward, k = 5, border = 2:9)
+
+
+## spliting the "EUProtein_hcl_ward" into 5 clustres
+EUProtein_hcl_ward_w5 <- cutree(EUProtein_hcl_ward, 5) 
+
+
+str(EUProtein_hcl_ward_w5)  
+print(table(EUProtein_hcl_ward_w5)) ##to get the frequency distribution
+
+## a new column "w5" is added to the data which indicatesto which cluster each customer belongs in each clustering solution.
+##This will be utilized in analyzing similarities
+
+EUProtein$w5 <- EUProtein_hcl_ward_w5
+cbind(aggregate(EUProtein[, -10], list(EUProtein$w5), mean), Freq = as.vector(table(EUProtein_hcl_ward_w5)))
+
+##Listing out the cluster contents
+print(subset(EUProtein, w5 == 1))
+print(subset(EUProtein, w5 == 2))
+print(subset(EUProtein, w5 == 3))
+print(subset(EUProtein, w5 == 4))
+print(subset(EUProtein, w5 == 5))
+
+#K-MEANS CLUSTERING:
+##Reading in the data
+ItalianWineType <- read.csv("ItalianWineSamples.csv", header = TRUE)
+
+## checking if there are	observations with	missing	values:
+any(is.na(ItalianWineType))
+which(complete.cases(ItalianWineType) == FALSE)
+
+##observing the overall structure of the dataset
+str(ItalianWineType)
+head(ItalianWineType)
+
+## utilizing only numerical variables for clustering as its difficult to measure dissimilarity between categorical values
+ItalianWine <- ItalianWineType[, -1]
+
+## scaling/standardizing the data using the scale() function:
+ItalianWine_scaled <- scale(ItalianWine)
+head(ItalianWine_scaled)
+
+## Determining the optimal number of clusters using K-Means Method 1: Elbow Method
+
+sum_of_squares <- function(k, data) {  ## wss() calculates the "Total Within-Cluster Sum of Squares" for each K
+  kmeans(data, k, iter.max = 20, nstart = 100)$tot.withinss  
+}
+### maximum iteration is set to 20 iter.max = 20 and set nstart = 100 due to size of the dataset
+
+set.seed(150) ## To get a reproducible random result.
+ItalianWine_wss <- sapply(2:10, sum_of_squares, data = ItalianWine_scaled)  ## checking Total WSS for K = 2,...,10
+
+plot(2:10, ItalianWine_wss,  ## We plot the "Total WSS" for each K
+     type = "b",  ## Points with line connection
+     pch = 19,    ## solid circle
+     frame = FALSE,
+     xlab = "Number of clusters K",
+     ylab = "Total within-clusters sum of squares")
+##Optimal number of clusters is 3
+
+## To determine the optimal number of clusters using K-Means Average NbClust Method
+library("NbClust")
+
+set.seed(150)
+NbClust(ItalianWine_scaled, distance = "euclidean", min.nc = 2, max.nc = 10, method = "kmeans")
+
+par(mfrow = c(1, 1))
+## According to the "majority rule", the best number of clusters is also 3.
+
+
+set.seed(150)
+ItalianWine_k3 <- kmeans(ItalianWine_scaled, 3, iter.max = 20, nstart = 100)
+
+ItalianWineType$k3 <- ItalianWine_k3$cluster  ## We add a new column "k3" to the data which indicates
+## to which cluster each customer belong.
+str(subset(ItalianWineType, k3 == 1))
+str(subset(ItalianWineType, k3 == 2))
+str(subset(ItalianWineType, k3 == 3))
+
+
+## Comparing cluster solutions with the type variable
+print(aggregate(ItalianWineType, list(ItalianWineType$k3), mean))
+
+cbind(aggregate(ItalianWineType[, -14], list(ItalianWineType$k3), mean), Freq = as.vector(table(ItalianWine_k3$cluster)))
+
+print(subset(ItalianWineType, Type == 1))
+##All observations in Type 1 belong to the Cluster 1 subgroup
+print(subset(ItalianWineType, Type == 2))
+##There are a few observations in Type 2 which are in Cluster 2 and 1 but most belong to Cluster 3 subgroup 
+print(subset(ItalianWineType, Type == 3))
+##All observations in Type 3 belongs to the Cluster 2 subgroup
